@@ -374,7 +374,18 @@
 
         <div class="flex flex-col gap-2">
           <label class="text-xs font-semibold text-slate-300">Pega aquí el contenido copiado (separado por tabulaciones):</label>
-          <textarea id="iol-paste-area" rows="8" placeholder="Fecha	Número	Ticker	Descripción	Tipo	Estado	Cantidad	Precio	Monto	Comisión...&#10;24/06/2026	123456	AL30	Compra	Liquidada	100	$ 97.840,00	$ 97.840,00	$ 450,00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500/50 font-mono transition-all"></textarea>
+          <textarea id="iol-paste-area" rows="6" placeholder="Fecha	Número	Ticker	Descripción	Tipo	Estado	Cantidad	Precio	Monto	Comisión...&#10;24/06/2026	123456	AL30	Compra	Liquidada	100	$ 97.840,00	$ 97.840,00	$ 450,00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500/50 font-mono transition-all"></textarea>
+        </div>
+
+        <!-- File Drop / Uploader -->
+        <div class="flex flex-col gap-2">
+          <label class="text-xs font-semibold text-slate-300">O bien, sube directamente el archivo de movimientos (.xls):</label>
+          <div class="relative group cursor-pointer border border-dashed border-slate-800 hover:border-brand-500/50 bg-slate-950 hover:bg-slate-900/50 rounded-xl p-5 transition-all flex flex-col items-center justify-center gap-1.5" onclick="document.getElementById('iol-file-input').click()">
+            <input type="file" id="iol-file-input" accept=".xls" class="hidden" onchange="handleIOLFileSelect(event)">
+            <i data-lucide="file-spreadsheet" id="upload-icon" class="w-6 h-6 text-slate-500 group-hover:text-brand-400 transition-all"></i>
+            <span id="upload-text" class="text-xs font-semibold text-slate-400 group-hover:text-slate-300 transition-all text-center">Hacer clic para seleccionar archivo o arrastrar aquí</span>
+            <span class="text-[10px] text-slate-600 text-center">Soporta el archivo MovimientosHistoricos.xls exportado de IOL</span>
+          </div>
         </div>
 
         <!-- Information / Instructions Alert -->
@@ -805,6 +816,91 @@
       } catch (err) {
         showToast('Error', 'Ocurrió un error al procesar el texto.', true);
       }
+    }
+
+    // Handle file selection and parsing
+    function handleIOLFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const uploadText = document.getElementById('upload-text');
+      uploadText.innerText = `Leyendo: ${file.name}...`;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        
+        try {
+          if (text.includes('<table') || text.includes('<html>')) {
+            const parsedTsv = parseIOLHtmlTable(text);
+            if (!parsedTsv || parsedTsv.trim().split('\n').length <= 1) {
+              throw new Error('No se encontraron transacciones terminadas en el archivo HTML/XLS.');
+            }
+            document.getElementById('iol-paste-area').value = parsedTsv;
+            uploadText.innerText = `Leído con éxito: ${file.name}`;
+            showToast('Archivo Cargado', 'Haz clic en "Procesar Transacciones" para guardar los cambios.');
+          } else {
+            // Fallback for raw text files
+            document.getElementById('iol-paste-area').value = text;
+            uploadText.innerText = `Leído con éxito: ${file.name}`;
+            showToast('Archivo Cargado', 'Haz clic en "Procesar Transacciones" para guardar los cambios.');
+          }
+        } catch (err) {
+          uploadText.innerText = 'Error al leer el archivo';
+          showToast('Error', err.message, true);
+        }
+      };
+      
+      reader.onerror = function() {
+        uploadText.innerText = 'Error al leer el archivo';
+        showToast('Error', 'No se pudo leer el archivo.', true);
+      };
+      
+      reader.readAsText(file);
+    }
+
+    function parseIOLHtmlTable(htmlContent) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlContent, 'text/html');
+      const rows = doc.querySelectorAll('tr');
+      if (rows.length === 0) return '';
+      
+      let tsvLines = [];
+      tsvLines.push("Fecha\tTicker\tOperacion\tCantidad\tPrecio\tComision");
+      
+      for (let i = 0; i < rows.length; i++) {
+        const tds = rows[i].querySelectorAll('td');
+        if (tds.length < 12) continue; // Must cover at least up to Monto
+        
+        const mvtType = tds[2].innerText.trim();
+        const match = mvtType.match(/^(Compra|Venta)\((.+?)\)/i);
+        if (!match) continue; // Skip dividends, deposits, etc.
+        
+        const state = tds[5].innerText.trim().toLowerCase();
+        if (state !== 'terminada') continue; // Only completed transactions
+        
+        const fecha = tds[3].innerText.trim();
+        const operacion = match[1];
+        const ticker = match[2];
+        const cantidad = tds[6].innerText.trim();
+        const precio = tds[7].innerText.trim();
+        
+        // Clean and parse numbers (Spanish format with dot as thousand separator and comma as decimal separator)
+        const cleanVal = (txt) => {
+          if (!txt) return 0;
+          let clean = txt.trim().replace(/\./g, '').replace(/,/g, '.');
+          return parseFloat(clean) || 0;
+        };
+        
+        const comis = cleanVal(tds[8].innerText);
+        const iva = cleanVal(tds[9].innerText);
+        const otros = cleanVal(tds[10].innerText);
+        const comision = (comis + iva + otros).toFixed(2);
+        
+        tsvLines.push(`${fecha}\t${ticker}\t${operacion}\t${cantidad}\t${precio}\t${comision}`);
+      }
+      
+      return tsvLines.join('\n');
     }
 
     // Reset IOL History
