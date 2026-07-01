@@ -134,12 +134,60 @@ async function initDb() {
   }
 }
 
-// Heuristics to check if ticker is a bond (so we scrape Rava instead of Yahoo)
+// Heuristics to check if ticker is a bond or corporate bond (ON)
 function isBondTicker(ticker) {
-  // Matches typical bond names like: AL30, GD30, AL30D, BPO27, AE38, etc.
-  // 2 to 4 letters, followed by 2 digits, and optionally a currency letter (D/C/Y) at the end
-  return /^[A-Z]{2,4}[0-9]{2}[A-Z]?$/.test(ticker.toUpperCase());
+  ticker = ticker.toUpperCase().trim();
+  
+  // 1. Sovereign bonds: AL30, GD30, AE38, AL30D, GD30D, T2X4, etc.
+  if (/^[A-Z]{2,4}[0-9]{2}[A-Z]?$/.test(ticker)) return true;
+  
+  // 2. Corporate bonds (ONs) with numbers: e.g. IRC1O, MGC9O, MGC9D
+  if (/^[A-Z]{3,4}[0-9][A-Z]$/.test(ticker)) return true;
+  
+  // 3. Corporate bonds (ONs) with 5 letters: e.g. MRCDO, MRCAD, YMCQO, YMCQD, CSJYO, CSJYD
+  // Ends in O, D, C, Y
+  if (/^[A-Z]{5}$/.test(ticker)) {
+    const endsWithBondLetter = /[ODCY]$/.test(ticker);
+    if (endsWithBondLetter) {
+      // Exclude cases like GGALD, PAMPD where prefix is a known local stock
+      const prefix4 = ticker.substring(0, 4);
+      const knownStocks = ['GGAL', 'PAMP', 'ALUA', 'TXAR', 'YPFD', 'LOMA', 'CEPU', 'EDN', 'BMA', 'BYMA', 'VALO', 'COME', 'CRES', 'TRAN', 'SUPV', 'BHIP'];
+      if (knownStocks.includes(prefix4)) {
+        return false;
+      }
+      return true; // Corporate bond (ON)
+    }
+  }
+  
+  return false;
 }
+
+// Classify traditional assets: Acción, CEDEAR, Bono, or ON
+function getAssetType(ticker) {
+  ticker = ticker.toUpperCase().trim();
+  if (isBondTicker(ticker)) {
+    // Sovereign bonds usually start with AL, GD, AE, CO, BP, PR, TO, TX, T2X
+    const isSovereign = /^(AL|GD|AE|CO|BP|PR|TO|TX|T2X)/.test(ticker);
+    return isSovereign ? 'Bono' : 'ON';
+  }
+  
+  const localStocks = [
+    'ALUA', 'TXAR', 'GGAL', 'PAMP', 'YPFD', 'BMA', 'LOMA', 'BYMA', 
+    'VALO', 'CEPU', 'EDN', 'TGNO4', 'TGSU2', 'COME', 'MIRG', 'CRES', 
+    'TRAN', 'BHIP', 'SUPV', 'MTR', 'SAMI', 'AGRO', 'HARG', 'LEDE'
+  ];
+  
+  let baseTicker = ticker;
+  if (ticker.length === 5 && /[DC]$/.test(ticker)) {
+    baseTicker = ticker.substring(0, 4);
+  }
+  
+  if (localStocks.includes(baseTicker)) {
+    return 'Acción';
+  }
+  return 'CEDEAR';
+}
+
 
 // Helper to sanitize numeric inputs from copy-paste
 function cleanNumber(str) {
@@ -801,7 +849,8 @@ app.get('/api/portfolio', async (req, res) => {
         ganancia_ars: gainArs,
         ganancia_pct: gainPct,
         isBond,
-        isUsdAsset
+        isUsdAsset,
+        tipo: getAssetType(ticker)
       });
     });
 
@@ -891,6 +940,24 @@ app.get('/api/historial', async (req, res) => {
   try {
     const history = await dbAll(`SELECT * FROM historial_patrimonio ORDER BY fecha ASC`);
     res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Transactions list (with optional ticker filter)
+app.get('/api/transactions', async (req, res) => {
+  try {
+    const { ticker } = req.query;
+    let query = `SELECT * FROM transacciones_iol`;
+    const params = [];
+    if (ticker) {
+      query += ` WHERE ticker = ?`;
+      params.push(ticker.toUpperCase().trim());
+    }
+    query += ` ORDER BY fecha DESC`;
+    const rows = await dbAll(query, params);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
