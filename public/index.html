@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patrimonio Total Unificado - Dashboard</title>
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons (lightweight icon set via SVG or CDN script) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f3ff',
+              100: '#e1e7ff',
+              200: '#c8d4ff',
+              300: '#a2b7ff',
+              400: '#738eff',
+              500: '#465eff',
+              600: '#2c3bfd',
+              700: '#1e24ea',
+              800: '#1b1dbd',
+              900: '#1c1f96',
+              950: '#07071f',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    /* Glassmorphism scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.2);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.4);
+    }
+    
+    .glass-card {
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    
+    .glass-card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-card-hover:hover {
+      transform: translateY(-2px);
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(99, 102, 241, 0.1);
+    }
+
+    .active-tab {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%);
+      border-left: 4px solid #6366f1;
+      color: #ffffff;
+    }
+    
+    /* Animation pulse */
+    .pulse-glow {
+      animation: pulseGlow 2s infinite alternate;
+    }
+    @keyframes pulseGlow {
+      0% {
+        box-shadow: 0 0 5px rgba(99, 102, 241, 0.2);
+      }
+      100% {
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col md:flex-row antialiased">
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-5 right-5 z-50 transform translate-y-[-100px] opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="glass-card flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border-l-4 border-l-brand-500">
+      <div id="toast-icon" class="text-brand-400">
+        <i data-lucide="check-circle" class="w-5 h-5"></i>
+      </div>
+      <div class="flex flex-col">
+        <span id="toast-title" class="font-semibold text-sm text-white">Éxito</span>
+        <span id="toast-desc" class="text-xs text-slate-300">Operación completada con éxito.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar Navigation -->
+  <aside class="w-full md:w-64 flex-shrink-0 bg-slate-900/80 border-b md:border-b-0 md:border-r border-slate-800 backdrop-blur-lg flex flex-col justify-between p-6 z-20">
+    <div class="flex flex-col gap-8">
+      <!-- Logo / Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-purple-500 flex items-center justify-center shadow-lg shadow-brand-500/20">
+          <i data-lucide="wallet" class="w-5 h-5 text-white"></i>
+        </div>
+        <div class="flex flex-col">
+          <span class="font-bold text-white tracking-wide text-lg">PATRIMONIO</span>
+          <span class="text-xs text-slate-400 tracking-widest uppercase font-semibold">Unificado</span>
+        </div>
+      </div>
+      
+      <!-- Exchange Rate Widget -->
+      <div class="glass-card p-3.5 rounded-xl flex items-center justify-between border-slate-800/80">
+        <div class="flex items-center gap-2">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span class="text-xs text-slate-400 font-medium">Dólar Cripto</span>
+        </div>
+        <span id="live-exchange-rate" class="font-bold text-sm text-emerald-400">Cargando...</span>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex flex-col gap-1.5">
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all text-sm font-medium border-l-4 border-l-transparent">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          Vista Principal
+        </button>
+        <button onclick="switchTab('assets')" id="tab-assets" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all text-sm font-medium border-l-4 border-l-transparent">
+          <i data-lucide="table" class="w-4 h-4"></i>
+          Tabla de Activos
+        </button>
+        <button onclick="switchTab('upload')" id="tab-upload" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all text-sm font-medium border-l-4 border-l-transparent">
+          <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+          Carga Tradicional
+        </button>
+        <button onclick="switchTab('projection')" id="tab-projection" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all text-sm font-medium border-l-4 border-l-transparent">
+          <i data-lucide="trending-up" class="w-4 h-4"></i>
+          Proyección
+        </button>
+        <button onclick="switchTab('settings')" id="tab-settings" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all text-sm font-medium border-l-4 border-l-transparent">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+          Ajustes
+        </button>
+      </nav>
+    </div>
+
+    <!-- User / App Footnote -->
+    <div class="mt-8 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+      <span>VPS Micro Oracle</span>
+      <span class="flex items-center gap-1">
+        <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
+        0MB Idle
+      </span>
+    </div>
+  </aside>
+
+  <!-- Main Content Panel -->
+  <main class="flex-1 p-6 md:p-10 overflow-y-auto max-w-7xl mx-auto w-full">
+    
+    <!-- Header with Currency Selector & Global Update Buttons -->
+    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+      <div>
+        <h1 id="view-title" class="text-3xl font-bold text-white">Vista Principal</h1>
+        <p class="text-xs text-slate-400 mt-1">Monitorea y proyecta tu patrimonio consolidado en tiempo real.</p>
+      </div>
+      
+      <!-- Actions -->
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <!-- Currency Selector -->
+        <div class="flex items-center bg-slate-900 border border-slate-800 p-1 rounded-xl">
+          <button onclick="setGlobalCurrency('ARS')" id="curr-btn-ars" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 text-white transition-all shadow-md">ARS</button>
+          <button onclick="setGlobalCurrency('USD')" id="curr-btn-usd" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">USD</button>
+        </div>
+        
+        <!-- Refresh Button -->
+        <button onclick="refreshData()" class="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 px-4 py-2 rounded-xl text-xs font-semibold transition-all">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="refresh-icon"></i>
+          Actualizar
+        </button>
+      </div>
+    </header>
+
+    <!-- SECTION: DASHBOARD / VISTA PRINCIPAL -->
+    <section id="section-dashboard" class="flex flex-col gap-6">
+      
+      <!-- KPI cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Unified Portfolio Value -->
+        <div class="glass-card glass-card-hover p-6 rounded-2xl relative overflow-hidden">
+          <div class="absolute -right-4 -bottom-4 opacity-5 text-slate-100">
+            <i data-lucide="wallet" class="w-24 h-24"></i>
+          </div>
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Patrimonio Total</span>
+          <div class="mt-2.5 flex items-baseline gap-2">
+            <h2 id="kpi-total-val" class="text-3xl font-extrabold text-white">...</h2>
+            <span id="kpi-total-val-alt" class="text-xs font-medium text-slate-400"></span>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2">Consolidación IOL + Binance + Caja Manual</p>
+        </div>
+
+        <!-- Total Historical Investment -->
+        <div class="glass-card glass-card-hover p-6 rounded-2xl relative overflow-hidden">
+          <div class="absolute -right-4 -bottom-4 opacity-5 text-slate-100">
+            <i data-lucide="piggy-bank" class="w-24 h-24"></i>
+          </div>
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Inversión Histórica</span>
+          <div class="mt-2.5 flex items-baseline gap-2">
+            <h2 id="kpi-total-cost" class="text-3xl font-extrabold text-slate-300">...</h2>
+            <span id="kpi-total-cost-alt" class="text-xs font-medium text-slate-400"></span>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2">Costo total ponderado + comisiones</p>
+        </div>
+
+        <!-- Global Returns -->
+        <div class="glass-card glass-card-hover p-6 rounded-2xl relative overflow-hidden">
+          <div class="absolute -right-4 -bottom-4 opacity-5 text-slate-100">
+            <i data-lucide="line-chart" class="w-24 h-24"></i>
+          </div>
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Rendimiento Global</span>
+          <div class="mt-2.5 flex items-baseline gap-2">
+            <h2 id="kpi-total-return" class="text-3xl font-extrabold text-emerald-400">...</h2>
+            <span id="kpi-total-return-pct" class="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">...</span>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2">Ganancia absoluta acumulada en cartera</p>
+        </div>
+      </div>
+
+      <!-- Charts Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Distribution Chart (Donut) -->
+        <div class="glass-card p-6 rounded-2xl lg:col-span-1 flex flex-col justify-between">
+          <div>
+            <h3 class="font-bold text-white text-base">Distribución de Cartera</h3>
+            <p class="text-[11px] text-slate-400">Ponderación por tipo de plataforma</p>
+          </div>
+          <div class="my-6 flex items-center justify-center relative" style="height: 200px;">
+            <canvas id="allocationChart"></canvas>
+            <div id="chart-no-data" class="absolute inset-0 flex items-center justify-center bg-slate-950/80 rounded-xl hidden">
+              <span class="text-xs text-slate-500 font-semibold">Sin activos cargados</span>
+            </div>
+          </div>
+          <div class="flex flex-col gap-2 border-t border-slate-800/80 pt-4 text-xs">
+            <div class="flex justify-between">
+              <span class="flex items-center gap-1.5 text-slate-400"><span class="w-2 h-2 rounded-full bg-brand-500"></span>IOL Tradicional</span>
+              <span id="dist-iol-val" class="font-semibold text-slate-200">0.00%</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="flex items-center gap-1.5 text-slate-400"><span class="w-2 h-2 rounded-full bg-purple-500"></span>Binance Cripto</span>
+              <span id="dist-binance-val" class="font-semibold text-slate-200">0.00%</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="flex items-center gap-1.5 text-slate-400"><span class="w-2 h-2 rounded-full bg-slate-500"></span>Caja Manual</span>
+              <span id="dist-cash-val" class="font-semibold text-slate-200">0.00%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Chart (Line) -->
+        <div class="glass-card p-6 rounded-2xl lg:col-span-2 flex flex-col justify-between">
+          <div class="flex justify-between items-start">
+            <div>
+              <h3 class="font-bold text-white text-base">Evolución Histórica</h3>
+              <p class="text-[11px] text-slate-400">Historial diario consolidado a las 18:00 hs</p>
+            </div>
+            <!-- Manual Cron Trigger Button -->
+            <button onclick="triggerConsolidation()" class="flex items-center gap-1 bg-brand-600/10 hover:bg-brand-600/20 text-brand-400 border border-brand-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+              <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+              Guardar Foto Hoy
+            </button>
+          </div>
+          
+          <div class="my-4" style="height: 240px; position: relative;">
+            <canvas id="historyChart"></canvas>
+            <div id="history-no-data" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/40 rounded-xl gap-2 hidden">
+              <span class="text-xs text-slate-500 font-semibold">No hay historial diario guardado aún</span>
+              <span class="text-[10px] text-slate-600">Haz clic en "Guardar Foto Hoy" para crear el primer registro.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </section>
+
+    <!-- SECTION: ASSETS / TABLA DE ACTIVOS -->
+    <section id="section-assets" class="flex flex-col gap-8 hidden">
+      <!-- Traditional Assets Card -->
+      <div class="glass-card rounded-2xl overflow-hidden">
+        <div class="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-white text-base">Acciones, CEDEARs y Bonos (IOL)</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Cartera tradicional con cotizaciones Yahoo/Rava.</p>
+          </div>
+          <span class="text-xs font-bold text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg" id="iol-table-total">Total: ...</span>
+        </div>
+        <div class="overflow-x-auto w-full">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-900/50 text-slate-400 border-b border-slate-800/80">
+              <tr>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider">Ticker</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Cantidad</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">PPC Real</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Cotización Actual</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Costo Total</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Valorizado</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Rendimiento ($)</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Rendimiento (%)</th>
+              </tr>
+            </thead>
+            <tbody id="traditional-table-body" class="divide-y divide-slate-800/50">
+              <tr>
+                <td colspan="8" class="px-6 py-10 text-center text-slate-500">Cargando activos tradicionales...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Crypto Assets Card -->
+      <div class="glass-card rounded-2xl overflow-hidden">
+        <div class="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-white text-base">Criptomonedas (Binance Spot & Funding)</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Saldos obtenidos on-demand vía API de Binance.</p>
+          </div>
+          <span class="text-xs font-bold text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg" id="binance-table-total">Total: ...</span>
+        </div>
+        <div class="overflow-x-auto w-full">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-900/50 text-slate-400 border-b border-slate-800/80">
+              <tr>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider">Moneda</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Balance</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Precio USD</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Precio ARS</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Valorizado USD</th>
+                <th class="px-6 py-4 font-semibold uppercase tracking-wider text-right">Valorizado ARS</th>
+              </tr>
+            </thead>
+            <tbody id="crypto-table-body" class="divide-y divide-slate-800/50">
+              <tr>
+                <td colspan="6" class="px-6 py-10 text-center text-slate-500">Cargando activos cripto...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: UPLOAD / CARGA TRADICIONAL -->
+    <section id="section-upload" class="flex flex-col gap-6 hidden">
+      <div class="glass-card p-6 rounded-2xl flex flex-col gap-6">
+        <div>
+          <h3 class="font-bold text-white text-base">Importador de Detalles de Operaciones (IOL)</h3>
+          <p class="text-xs text-slate-400 mt-1">Copia y pega la tabla desde la web de InvertirOnline (Mi Cuenta > Movimientos > Detalles de operaciones).</p>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label class="text-xs font-semibold text-slate-300">Pega aquí el contenido copiado (separado por tabulaciones):</label>
+          <textarea id="iol-paste-area" rows="8" placeholder="Fecha	Número	Ticker	Descripción	Tipo	Estado	Cantidad	Precio	Monto	Comisión...&#10;24/06/2026	123456	AL30	Compra	Liquidada	100	$ 97.840,00	$ 97.840,00	$ 450,00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500/50 font-mono transition-all"></textarea>
+        </div>
+
+        <!-- Information / Instructions Alert -->
+        <div class="bg-brand-600/5 border border-brand-500/20 p-4 rounded-xl flex gap-3 text-xs text-slate-300">
+          <i data-lucide="info" class="w-4 h-4 text-brand-400 flex-shrink-0 mt-0.5"></i>
+          <div class="flex flex-col gap-1.5">
+            <span class="font-bold text-slate-200">¿Cómo funciona el importador?</span>
+            <ul class="list-disc pl-4 flex flex-col gap-1 text-[11px] text-slate-400">
+              <li>El parser detectará automáticamente los encabezados o la alineación de columnas.</li>
+              <li>Calcula y limpia símbolos de moneda ($ o USD), puntos y comas de separadores decimales/miles de forma inteligente.</li>
+              <li>Genera un código hash único por fila para **evitar que se inserten filas duplicadas** si vuelves a copiar el mismo rango.</li>
+              <li>La base de datos SQLite física consolidará todas tus compras y ventas de forma definitiva.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800/80 pt-5">
+          <!-- Reset button -->
+          <button onclick="confirmResetIOL()" class="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-xl text-xs font-bold transition-all">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+            Borrar Todo el Historial IOL
+          </button>
+          
+          <!-- Submit button -->
+          <button onclick="submitIOLPaste()" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-brand-500/10 hover:shadow-brand-500/25 transition-all">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            Procesar Transacciones
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: PROJECTION / SIMULADOR -->
+    <section id="section-projection" class="flex flex-col gap-6 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Control Sliders -->
+        <div class="glass-card p-6 rounded-2xl lg:col-span-1 flex flex-col gap-6">
+          <div>
+            <h3 class="font-bold text-white text-base">Simulación Interactiva</h3>
+            <p class="text-xs text-slate-400 mt-1">Calcula la proyección futura de interés compuesto (ejecución 100% cliente).</p>
+          </div>
+          
+          <!-- Current Assets Info -->
+          <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col gap-2">
+            <span class="text-xs text-slate-400">Patrimonio consolidado base:</span>
+            <span id="proj-base-wealth" class="text-xl font-bold text-white">...</span>
+          </div>
+
+          <!-- Slider 1: Years -->
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between text-xs">
+              <span class="font-semibold text-slate-300">Años a Proyectar</span>
+              <span id="slider-years-val" class="font-bold text-brand-400">10 años</span>
+            </div>
+            <input type="range" id="slider-years" min="1" max="40" value="10" oninput="runProjectionSimulation()" class="w-full accent-brand-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+          </div>
+
+          <!-- Slider 2: Monthly Contribution -->
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between text-xs">
+              <span class="font-semibold text-slate-300">Aporte Mensual</span>
+              <span id="slider-monthly-val" class="font-bold text-brand-400">$100 / mes</span>
+            </div>
+            <input type="range" id="slider-monthly" min="0" max="2500" step="50" value="100" oninput="runProjectionSimulation()" class="w-full accent-brand-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+          </div>
+
+          <!-- Slider 3: Interest Rate -->
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between text-xs">
+              <span class="font-semibold text-slate-300">Tasa de Rendimiento Anual (TNA)</span>
+              <span id="slider-rate-val" class="font-bold text-brand-400">8.00%</span>
+            </div>
+            <input type="range" id="slider-rate" min="1" max="30" step="0.5" value="8" oninput="runProjectionSimulation()" class="w-full accent-brand-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+            <p class="text-[10px] text-slate-500">Estimado histórico de carteras moderadas: 7-9% anual en USD.</p>
+          </div>
+        </div>
+
+        <!-- Result Projection Chart -->
+        <div class="glass-card p-6 rounded-2xl lg:col-span-2 flex flex-col justify-between">
+          <div>
+            <h3 class="font-bold text-white text-base">Crecimiento Futuro Estimado</h3>
+            <p class="text-xs text-slate-400 mt-1">Comparativa entre capital invertido directo vs interés compuesto reinvertido.</p>
+          </div>
+          
+          <div class="my-4" style="height: 240px; position: relative;">
+            <canvas id="projectionChart"></canvas>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-4 text-xs">
+            <div class="flex flex-col">
+              <span class="text-slate-400">Total Proyectado Final:</span>
+              <span id="proj-final-val" class="text-lg font-bold text-brand-400">...</span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-slate-400">Total Ahorrado Directo:</span>
+              <span id="proj-direct-val" class="text-lg font-bold text-slate-300">...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: SETTINGS / AJUSTES -->
+    <section id="section-settings" class="flex flex-col gap-6 hidden">
+      <div class="glass-card p-6 rounded-2xl flex flex-col gap-6">
+        <div>
+          <h3 class="font-bold text-white text-base">Configuración General</h3>
+          <p class="text-xs text-slate-400 mt-1">Administra tus claves de Binance y saldos manuales guardados de forma segura en SQLite.</p>
+        </div>
+
+        <!-- Credentials Form -->
+        <form id="settings-form" onsubmit="saveConfig(event)" class="flex flex-col gap-5">
+          <!-- API Keys -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-slate-300">Binance API Key (Spot + Funding Wallet)</label>
+              <input type="text" id="binance-api-key" placeholder="Pega tu API Key..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-all">
+              <span id="binance-api-key-status" class="text-[10px] text-slate-500">No configurado</span>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-slate-300">Binance API Secret</label>
+              <input type="password" id="binance-api-secret" placeholder="Pega tu API Secret..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-all">
+              <span id="binance-api-secret-status" class="text-[10px] text-slate-500">No configurado</span>
+            </div>
+          </div>
+
+          <!-- Manual Cash Balances -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-slate-300">Saldo Manual en Caja Dólar ($ USD)</label>
+              <input type="number" step="any" id="manual-usd" placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500/50 transition-all">
+              <span class="text-[10px] text-slate-500">Caja de ahorro física, billetes en mano u otros dólares off-broker.</span>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-slate-300">Saldo Manual en Caja Pesos ($ ARS)</label>
+              <input type="number" step="any" id="manual-ars" placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500/50 transition-all">
+              <span class="text-[10px] text-slate-500">Plazo fijo, caja de ahorro local, efectivo u otros pesos off-broker.</span>
+            </div>
+          </div>
+
+          <!-- Projection Defaults & Password -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-slate-300">Tasa de Proyección Predeterminada (%)</label>
+              <input type="number" step="0.1" id="rate-override" placeholder="8.0" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500/50 transition-all">
+              <span class="text-[10px] text-slate-500">Tasa anual por defecto en la pestaña de proyección.</span>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-slate-300">Contraseña del Dashboard (Acceso Seguro)</label>
+              <input type="password" id="dashboard-password" placeholder="Establecer contraseña para bloquear acceso..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-all">
+              <span id="dashboard-password-status" class="text-[10px] text-slate-500">No configurado (Acceso público abierto)</span>
+            </div>
+          </div>
+
+          <!-- Save Button -->
+          <div class="border-t border-slate-800/80 pt-5 flex justify-end">
+            <button type="submit" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-brand-500/10 hover:shadow-brand-500/25 transition-all">
+              <i data-lucide="save" class="w-4 h-4"></i>
+              Guardar Cambios
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Danger Zone Card -->
+      <div class="glass-card p-6 rounded-2xl flex flex-col gap-4 mt-6 border-red-500/20">
+        <div>
+          <h3 class="font-bold text-red-400 text-base">Zona de Peligro</h3>
+          <p class="text-xs text-slate-400 mt-1">Borra datos del historial de evolución o de transacciones para iniciar una cuenta limpia.</p>
+        </div>
+        <div class="flex flex-wrap gap-4 border-t border-slate-800/80 pt-4">
+          <button onclick="confirmResetIOL()" class="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-xl text-xs font-bold transition-all">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+            Borrar Historial IOL
+          </button>
+          <button onclick="confirmResetHistory()" class="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-xl text-xs font-bold transition-all">
+            <i data-lucide="line-chart" class="w-4 h-4"></i>
+            Borrar Historial de Evolución (Gráfico)
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Frontend Logic -->
+  <script>
+    let globalCurrency = 'ARS'; // ARS or USD
+    let portfolioData = null;
+    let historyData = null;
+    let exchangeRate = 1500;
+    
+    // Chart References
+    let allocationChartObj = null;
+    let historyChartObj = null;
+    let projectionChartObj = null;
+
+    // View Routing
+    function switchTab(tabId) {
+      // Hide all sections
+      ['dashboard', 'assets', 'upload', 'projection', 'settings'].forEach(id => {
+        document.getElementById(`section-${id}`).classList.add('hidden');
+        document.getElementById(`tab-${id}`).classList.remove('active-tab');
+      });
+      
+      // Show target section
+      document.getElementById(`section-${tabId}`).classList.remove('hidden');
+      document.getElementById(`tab-${tabId}`).classList.add('active-tab');
+      
+      // Update Title
+      const titles = {
+        dashboard: 'Vista Principal',
+        assets: 'Tabla de Activos',
+        upload: 'Carga Tradicional (IOL)',
+        projection: 'Proyección Interactiva',
+        settings: 'Ajustes de Cuenta'
+      };
+      document.getElementById('view-title').innerText = titles[tabId];
+      
+      // Render Specific Tab Operations
+      if (tabId === 'projection') {
+        runProjectionSimulation();
+      } else if (tabId === 'dashboard') {
+        setTimeout(() => {
+          if (allocationChartObj) allocationChartObj.resize();
+          if (historyChartObj) historyChartObj.resize();
+        }, 100);
+      }
+    }
+
+    // Toast Messages
+    function showToast(title, desc, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastTitle = document.getElementById('toast-title');
+      const toastDesc = document.getElementById('toast-desc');
+      const toastIcon = document.getElementById('toast-icon');
+      
+      toastTitle.innerText = title;
+      toastDesc.innerText = desc;
+      
+      if (isError) {
+        toastIcon.innerHTML = `<i data-lucide="x-circle" class="w-5 h-5 text-red-500"></i>`;
+        toast.firstElementChild.classList.remove('border-l-brand-500');
+        toast.firstElementChild.classList.add('border-l-red-500');
+      } else {
+        toastIcon.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5 text-emerald-500"></i>`;
+        toast.firstElementChild.classList.remove('border-l-red-500');
+        toast.firstElementChild.classList.add('border-l-brand-500');
+      }
+      
+      lucide.createIcons();
+      
+      toast.classList.remove('translate-y-[-100px]', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-[-100px]', 'opacity-0');
+      }, 3500);
+    }
+
+    // Set Currency
+    function setGlobalCurrency(currency) {
+      globalCurrency = currency;
+      
+      const btnArs = document.getElementById('curr-btn-ars');
+      const btnUsd = document.getElementById('curr-btn-usd');
+      
+      if (currency === 'ARS') {
+        btnArs.className = "px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 text-white transition-all shadow-md";
+        btnUsd.className = "px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+      } else {
+        btnUsd.className = "px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 text-white transition-all shadow-md";
+        btnArs.className = "px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+      }
+      
+      updateUI();
+      if (historyData) renderHistoryChart();
+    }
+
+    // Format Currency
+    function formatCurrency(val, decimals = 2) {
+      const symbol = globalCurrency === 'ARS' ? '$' : 'USD';
+      return symbol + ' ' + val.toLocaleString('es-AR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    // Refresh Data Wrapper
+    async function refreshData() {
+      const icon = document.getElementById('refresh-icon');
+      icon.classList.add('animate-spin');
+      try {
+        await Promise.all([loadPortfolio(), loadHistory()]);
+        showToast('Actualizado', 'Datos sincronizados correctamente.');
+      } catch (err) {
+        showToast('Error', 'Sincronización fallida.', true);
+      } finally {
+        icon.classList.remove('animate-spin');
+      }
+    }
+
+    // Load Configuration
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/config');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        
+        document.getElementById('manual-usd').value = data.manual_usd_balance || 0;
+        document.getElementById('manual-ars').value = data.manual_ars_balance || 0;
+        document.getElementById('rate-override').value = data.interest_rate_override || 8;
+        
+        // Status labels
+        document.getElementById('binance-api-key-status').innerText = data.binance_api_key_set ? 
+          `Configurado (${data.binance_api_key_masked})` : 'No configurado';
+        document.getElementById('binance-api-secret-status').innerText = data.binance_api_secret_set ? 
+          `Configurado (${data.binance_api_secret_masked})` : 'No configurado';
+        document.getElementById('dashboard-password-status').innerText = data.dashboard_password_set ? 
+          `Configurado (${data.dashboard_password_masked})` : 'No configurado (Acceso público abierto)';
+          
+        // Setup initial rate in projection range slider
+        document.getElementById('slider-rate').value = data.interest_rate_override || 8;
+        document.getElementById('slider-rate-val').innerText = (data.interest_rate_override || 8) + '%';
+      } catch (err) {
+        console.error('Error loading config:', err);
+      }
+    }
+
+    // Save Configuration
+    async function saveConfig(e) {
+      e.preventDefault();
+      const binance_api_key = document.getElementById('binance-api-key').value;
+      const binance_api_secret = document.getElementById('binance-api-secret').value;
+      const manual_usd_balance = document.getElementById('manual-usd').value;
+      const manual_ars_balance = document.getElementById('manual-ars').value;
+      const interest_rate_override = document.getElementById('rate-override').value;
+      const dashboard_password = document.getElementById('dashboard-password').value;
+
+      const bodyObj = {
+        manual_usd_balance: parseFloat(manual_usd_balance) || 0,
+        manual_ars_balance: parseFloat(manual_ars_balance) || 0,
+        interest_rate_override: parseFloat(interest_rate_override) || 8
+      };
+
+      if (binance_api_key.trim()) bodyObj.binance_api_key = binance_api_key.trim();
+      if (binance_api_secret.trim()) bodyObj.binance_api_secret = binance_api_secret.trim();
+      if (dashboard_password.trim()) bodyObj.dashboard_password = dashboard_password.trim();
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyObj)
+        });
+        if (!res.ok) throw new Error();
+        showToast('Guardado', 'La configuración se actualizó correctamente.');
+        
+        // Clear passwords in field
+        document.getElementById('binance-api-key').value = '';
+        document.getElementById('binance-api-secret').value = '';
+        document.getElementById('dashboard-password').value = '';
+        
+        await loadConfig();
+        await refreshData();
+      } catch (err) {
+        showToast('Error', 'No se pudo guardar la configuración.', true);
+      }
+    }
+
+    // Load Portfolio from API
+    async function loadPortfolio() {
+      const res = await fetch('/api/portfolio');
+      if (!res.ok) throw new Error('API portfolio error');
+      portfolioData = await res.json();
+      exchangeRate = portfolioData.dollar_cripto;
+      
+      // Update Sidebar Exchange Rate Label
+      document.getElementById('live-exchange-rate').innerText = '$ ' + exchangeRate.toFixed(2);
+      
+      updateUI();
+    }
+
+    // Load History from API
+    async function loadHistory() {
+      const res = await fetch('/api/historial');
+      if (!res.ok) throw new Error('API history error');
+      historyData = await res.json();
+      renderHistoryChart();
+    }
+
+    // Trigger daily consolidation screenshot manually
+    async function triggerConsolidation() {
+      try {
+        const res = await fetch('/api/cron-trigger', { method: 'POST' });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        showToast('Foto Guardada', `Consolidación de hoy registrada: ${formatCurrency(globalCurrency === 'ARS' ? data.total_ars : data.total_usd)}`);
+        await loadHistory();
+      } catch (err) {
+        showToast('Error', 'No se pudo generar la consolidación.', true);
+      }
+    }
+
+    // Upload parsed IOL paste
+    async function submitIOLPaste() {
+      const text = document.getElementById('iol-paste-area').value;
+      if (!text.trim()) {
+        showToast('Error', 'Por favor pega la tabla de IOL en la caja.', true);
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/upload-iol', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        
+        if (data.count > 0) {
+          showToast('Importado', `${data.count} operaciones tradicionales agregadas.`);
+          document.getElementById('iol-paste-area').value = '';
+          await refreshData();
+          switchTab('assets');
+        } else {
+          showToast('Sin Cambios', 'No se agregaron nuevas transacciones (duplicados detectados o formato incorrecto).');
+        }
+      } catch (err) {
+        showToast('Error', 'Ocurrió un error al procesar el texto.', true);
+      }
+    }
+
+    // Reset IOL History
+    function confirmResetIOL() {
+      if (confirm('¿Estás seguro de que deseas eliminar todas tus transacciones de InvertirOnline? Esta acción no se puede deshacer.')) {
+        resetIOL();
+      }
+    }
+
+    async function resetIOL() {
+      try {
+        const res = await fetch('/api/reset-iol', { method: 'POST' });
+        if (!res.ok) throw new Error();
+        showToast('Eliminado', 'Historial IOL limpio.');
+        await refreshData();
+      } catch (err) {
+        showToast('Error', 'No se pudo vaciar el historial.', true);
+      }
+    }
+
+    // Reset Evolution History
+    function confirmResetHistory() {
+      if (confirm('¿Estás seguro de que deseas eliminar todos los registros del gráfico de evolución diaria? Esta acción no se puede deshacer.')) {
+        resetHistory();
+      }
+    }
+
+    async function resetHistory() {
+      try {
+        const res = await fetch('/api/reset-history', { method: 'POST' });
+        if (!res.ok) throw new Error();
+        showToast('Eliminado', 'Historial de evolución limpio.');
+        await refreshData();
+      } catch (err) {
+        showToast('Error', 'No se pudo vaciar el historial.', true);
+      }
+    }
+
+    // Update UI Elements
+    function updateUI() {
+      if (!portfolioData) return;
+      
+      const isArs = globalCurrency === 'ARS';
+      const con = portfolioData.consolidated;
+      const trad = portfolioData.traditional;
+      const cryp = portfolioData.crypto;
+      const man = portfolioData.manual_balances;
+
+      // 1. KPI Cards
+      const totalVal = isArs ? con.total_ars : con.total_usd;
+      const totalCost = isArs ? con.total_cost_ars : con.total_cost_usd;
+      const gainVal = isArs ? con.gain_ars : con.gain_usd;
+      const gainPct = con.gain_pct;
+      
+      const totalValAlt = isArs ? con.total_usd : con.total_ars;
+      const totalCostAlt = isArs ? con.total_cost_usd : con.total_cost_ars;
+      const altCurrency = isArs ? 'USD' : 'ARS';
+
+      document.getElementById('kpi-total-val').innerText = formatCurrency(totalVal);
+      document.getElementById('kpi-total-val-alt').innerText = altCurrency + ' ' + totalValAlt.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+
+      document.getElementById('kpi-total-cost').innerText = formatCurrency(totalCost);
+      document.getElementById('kpi-total-cost-alt').innerText = altCurrency + ' ' + totalCostAlt.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+
+      const returnEl = document.getElementById('kpi-total-return');
+      const returnPctEl = document.getElementById('kpi-total-return-pct');
+
+      returnEl.innerText = (gainVal >= 0 ? '+' : '') + formatCurrency(gainVal);
+      returnPctEl.innerText = (gainPct >= 0 ? '+' : '') + gainPct.toFixed(2) + '%';
+      
+      // Update Return card Colors
+      if (gainVal >= 0) {
+        returnEl.className = "text-3xl font-extrabold text-emerald-400";
+        returnPctEl.className = "text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20";
+      } else {
+        returnEl.className = "text-3xl font-extrabold text-rose-400";
+        returnPctEl.className = "text-xs font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-lg border border-rose-500/20";
+      }
+
+      // 2. Overview Distribution Labels
+      const totalAllocVal = con.total_ars;
+      const iolShare = totalAllocVal > 0 ? (trad.total_value_ars / totalAllocVal) * 100 : 0;
+      const binanceShare = totalAllocVal > 0 ? (cryp.total_value_ars / totalAllocVal) * 100 : 0;
+      const cashShare = totalAllocVal > 0 ? ( (man.ars + man.usd * exchangeRate) / totalAllocVal) * 100 : 0;
+
+      document.getElementById('dist-iol-val').innerText = iolShare.toFixed(2) + '%';
+      document.getElementById('dist-binance-val').innerText = binanceShare.toFixed(2) + '%';
+      document.getElementById('dist-cash-val').innerText = cashShare.toFixed(2) + '%';
+
+      // Allocation Chart Donut Render
+      renderAllocationChart(iolShare, binanceShare, cashShare);
+
+      // 3. Tab: Assets Table Total Badges
+      const iolTableTotal = isArs ? trad.total_value_ars : trad.total_value_usd;
+      const cryTableTotal = isArs ? cryp.total_value_ars : cryp.total_value_usd;
+
+      document.getElementById('iol-table-total').innerText = 'Total: ' + formatCurrency(iolTableTotal);
+      document.getElementById('binance-table-total').innerText = 'Total: ' + formatCurrency(cryTableTotal);
+
+      // Populate Traditional Assets Table
+      const tradBody = document.getElementById('traditional-table-body');
+      if (trad.assets.length === 0) {
+        tradBody.innerHTML = `
+          <tr>
+            <td colspan="8" class="px-6 py-8 text-center text-slate-500">Sin activos registrados en IOL. Copia tu tabla de movimientos en la pestaña de carga.</td>
+          </tr>
+        `;
+      } else {
+        tradBody.innerHTML = trad.assets.map(asset => {
+          const costVal = isArs ? asset.costo_total_ars : asset.costo_total_usd;
+          const currVal = isArs ? asset.valor_actual_ars : asset.valor_actual_usd;
+          const gainVal = isArs ? asset.ganancia_ars : (asset.valor_actual_usd - asset.costo_total_usd);
+          const returnColorClass = gainVal >= 0 ? 'text-emerald-400' : 'text-rose-400';
+          
+          return `
+            <tr class="hover:bg-slate-900/30 transition-all">
+              <td class="px-6 py-4 font-bold text-white flex flex-col">
+                <span>${asset.ticker}</span>
+                <span class="text-[10px] text-slate-500 font-normal">${asset.isBond ? 'Bono' : 'Acción/CEDEAR'} ${asset.isUsdAsset ? '(USD)' : ''}</span>
+              </td>
+              <td class="px-6 py-4 text-right font-medium text-slate-300">${asset.cantidad.toLocaleString('es-AR')}</td>
+              <td class="px-6 py-4 text-right font-semibold text-slate-300">$ ${asset.ppc.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</td>
+              <td class="px-6 py-4 text-right font-semibold text-slate-300">$ ${asset.precio_actual.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</td>
+              <td class="px-6 py-4 text-right text-slate-400">${formatCurrency(costVal)}</td>
+              <td class="px-6 py-4 text-right text-slate-200 font-medium">${formatCurrency(currVal)}</td>
+              <td class="px-6 py-4 text-right font-semibold ${returnColorClass}">${gainVal >= 0 ? '+' : ''}${formatCurrency(gainVal)}</td>
+              <td class="px-6 py-4 text-right font-bold ${returnColorClass}">${asset.ganancia_pct >= 0 ? '+' : ''}${asset.ganancia_pct.toFixed(2)}%</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // Populate Crypto Assets Table
+      const crypBody = document.getElementById('crypto-table-body');
+      if (cryp.assets.length === 0) {
+        crypBody.innerHTML = `
+          <tr>
+            <td colspan="6" class="px-6 py-8 text-center text-slate-500">Sin criptoactivos. Setea tu Binance API Key en la pestaña de ajustes.</td>
+          </tr>
+        `;
+      } else {
+        crypBody.innerHTML = cryp.assets.map(asset => {
+          const valUSD = asset.valor_usd;
+          const valARS = asset.valor_ars;
+          
+          return `
+            <tr class="hover:bg-slate-900/30 transition-all">
+              <td class="px-6 py-4 font-bold text-white">${asset.asset}</td>
+              <td class="px-6 py-4 text-right font-medium text-slate-300">${asset.balance.toLocaleString('es-AR', { maximumFractionDigits: 8 })}</td>
+              <td class="px-6 py-4 text-right text-slate-400">USD ${asset.precio_usd.toLocaleString('es-AR', { maximumFractionDigits: 4 })}</td>
+              <td class="px-6 py-4 text-right text-slate-400">$ ${asset.precio_ars.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</td>
+              <td class="px-6 py-4 text-right text-slate-200 font-medium">USD ${valUSD.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td class="px-6 py-4 text-right text-slate-200 font-bold">$ ${valARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // Update projection baseline display
+      document.getElementById('proj-base-wealth').innerText = formatCurrency(totalVal);
+    }
+
+    // DONUT CHART: Allocation
+    function renderAllocationChart(iol, binance, cash) {
+      const ctx = document.getElementById('allocationChart').getContext('2d');
+      const emptyState = document.getElementById('chart-no-data');
+      
+      if (iol === 0 && binance === 0 && cash === 0) {
+        emptyState.classList.remove('hidden');
+        if (allocationChartObj) allocationChartObj.destroy();
+        return;
+      } else {
+        emptyState.classList.add('hidden');
+      }
+
+      if (allocationChartObj) {
+        allocationChartObj.data.datasets[0].data = [iol, binance, cash];
+        allocationChartObj.update();
+        return;
+      }
+
+      allocationChartObj = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['IOL Tradicional', 'Binance Cripto', 'Caja Manual'],
+          datasets: [{
+            data: [iol, binance, cash],
+            backgroundColor: ['#465eff', '#a855f7', '#64748b'],
+            borderWidth: 2,
+            borderColor: '#0f172a',
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          cutout: '75%'
+        }
+      });
+    }
+
+    // LINE CHART: Historical Evolution
+    function renderHistoryChart() {
+      const ctx = document.getElementById('historyChart').getContext('2d');
+      const emptyState = document.getElementById('history-no-data');
+
+      if (!historyData || historyData.length === 0) {
+        emptyState.classList.remove('hidden');
+        if (historyChartObj) historyChartObj.destroy();
+        return;
+      } else {
+        emptyState.classList.add('hidden');
+      }
+
+      const isArs = globalCurrency === 'ARS';
+      const labels = historyData.map(h => {
+        // Formatos de fecha DD/MM
+        const p = h.fecha.split('-');
+        return p.length === 3 ? `${p[2]}/${p[1]}` : h.fecha;
+      });
+      const dataValues = historyData.map(h => isArs ? h.total_ars : h.total_usd);
+
+      if (historyChartObj) {
+        historyChartObj.data.labels = labels;
+        historyChartObj.data.datasets[0].data = dataValues;
+        historyChartObj.data.datasets[0].label = isArs ? 'Patrimonio en ARS' : 'Patrimonio en USD';
+        historyChartObj.update();
+        return;
+      }
+
+      historyChartObj = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: isArs ? 'Patrimonio en ARS' : 'Patrimonio en USD',
+            data: dataValues,
+            fill: true,
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            borderColor: '#6366f1',
+            borderWidth: 3,
+            tension: 0.35,
+            pointRadius: 3,
+            pointBackgroundColor: '#6366f1',
+            pointBorderColor: '#0f172a',
+            pointBorderWidth: 1.5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              grid: { color: 'rgba(51, 65, 85, 0.15)' },
+              ticks: {
+                color: '#94a3b8',
+                callback: function(value) {
+                  return formatCurrency(value, 0);
+                }
+              }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8' }
+            }
+          }
+        }
+      });
+    }
+
+    // COMPOUND INTEREST PROJECTION SIMULATOR (PURE CLIENT SIDE)
+    function runProjectionSimulation() {
+      if (!portfolioData) return;
+
+      const isArs = globalCurrency === 'ARS';
+      const con = portfolioData.consolidated;
+      const initialCapital = isArs ? con.total_ars : con.total_usd;
+
+      const years = parseInt(document.getElementById('slider-years').value);
+      const monthlyContribution = parseFloat(document.getElementById('slider-monthly').value);
+      const annualRate = parseFloat(document.getElementById('slider-rate').value) / 100;
+
+      // Update slider badges
+      document.getElementById('slider-years-val').innerText = `${years} años`;
+      document.getElementById('slider-monthly-val').innerText = `${formatCurrency(monthlyContribution, 0)} / mes`;
+      document.getElementById('slider-rate-val').innerText = `${(annualRate * 100).toFixed(2)}%`;
+
+      const monthlyRate = annualRate / 12;
+      const totalMonths = years * 12;
+
+      const labels = [];
+      const compoundData = [];
+      const directData = [];
+
+      let currentCompound = initialCapital;
+      let currentDirect = initialCapital;
+
+      // Initial point
+      labels.push('Inicio');
+      compoundData.push(Math.round(initialCapital));
+      directData.push(Math.round(initialCapital));
+
+      for (let month = 1; month <= totalMonths; month++) {
+        // Compound simulation
+        currentCompound = currentCompound * (1 + monthlyRate) + monthlyContribution;
+        
+        // Direct simulation (no interest, just deposit)
+        currentDirect = currentDirect + monthlyContribution;
+
+        // Save annually or at the end
+        if (month % 12 === 0 || month === totalMonths) {
+          labels.push(`Año ${month / 12}`);
+          compoundData.push(Math.round(currentCompound));
+          directData.push(Math.round(currentDirect));
+        }
+      }
+
+      // Update Results
+      document.getElementById('proj-final-val').innerText = formatCurrency(currentCompound, 0);
+      document.getElementById('proj-direct-val').innerText = formatCurrency(currentDirect, 0);
+
+      // Render Projection Line Graph
+      const ctx = document.getElementById('projectionChart').getContext('2d');
+
+      if (projectionChartObj) {
+        projectionChartObj.data.labels = labels;
+        projectionChartObj.data.datasets[0].data = compoundData;
+        projectionChartObj.data.datasets[1].data = directData;
+        projectionChartObj.update();
+        return;
+      }
+
+      projectionChartObj = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Interés Compuesto',
+              data: compoundData,
+              borderColor: '#6366f1',
+              backgroundColor: 'rgba(99, 102, 241, 0.05)',
+              borderWidth: 3,
+              tension: 0.2,
+              fill: true
+            },
+            {
+              label: 'Aporte Directo',
+              data: directData,
+              borderColor: '#64748b',
+              borderDash: [5, 5],
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.1,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#94a3b8', font: { family: 'Outfit' } }
+            }
+          },
+          scales: {
+            y: {
+              grid: { color: 'rgba(51, 65, 85, 0.15)' },
+              ticks: {
+                color: '#94a3b8',
+                callback: function(value) {
+                  return formatCurrency(value, 0);
+                }
+              }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8' }
+            }
+          }
+        }
+      });
+    }
+
+    // App Initialization
+    async function initApp() {
+      // Setup icons
+      lucide.createIcons();
+      
+      // Default active tab styling
+      document.getElementById('tab-dashboard').classList.add('active-tab');
+      
+      // Load Initial App State
+      try {
+        await loadConfig();
+        await loadPortfolio();
+        await loadHistory();
+      } catch (err) {
+        showToast('Advertencia', 'Sin datos iniciales en DB, configura tus activos.', true);
+      }
+    }
+
+    window.onload = initApp;
+  </script>
+</body>
+</html>
