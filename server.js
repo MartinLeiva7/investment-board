@@ -825,14 +825,17 @@ app.get('/api/portfolio', async (req, res) => {
         cryptoTotalValueUsd += valUsd;
         cryptoTotalValueArs += valArs;
 
-        cryptoAssets.push({
-          asset: item.asset,
-          balance: item.balance,
-          precio_usd: priceUsd,
-          precio_ars: priceUsd * dollarCripto,
-          valor_usd: valUsd,
-          valor_ars: valArs
-        });
+        // Only list assets with a value of at least $1.00 USD
+        if (valUsd >= 1.00) {
+          cryptoAssets.push({
+            asset: item.asset,
+            balance: item.balance,
+            precio_usd: priceUsd,
+            precio_ars: priceUsd * dollarCripto,
+            valor_usd: valUsd,
+            valor_ars: valArs
+          });
+        }
       });
     }
 
