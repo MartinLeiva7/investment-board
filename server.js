@@ -246,36 +246,70 @@ async function fetchRavaPrice(ticker) {
   return cleanNumber(match[1]);
 }
 
+// ─── Price Cache ────────────────────────────────────────────────────────────
+const priceCache = new Map();    // ticker → { price, timestamp }
+const dollarCache = { value: null, timestamp: 0 };
+const PRICE_CACHE_TTL = 7 * 60 * 1000;  // 7 minutes in ms
+
+function getCachedPrice(ticker) {
+  const entry = priceCache.get(ticker);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > PRICE_CACHE_TTL) {
+    priceCache.delete(ticker);
+    return null;
+  }
+  return entry.price;
+}
+
+function setCachedPrice(ticker, price) {
+  priceCache.set(ticker, { price, timestamp: Date.now() });
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 async function fetchMarketPrice(ticker) {
   ticker = ticker.toUpperCase().trim();
+
+  // Return from cache if still fresh
+  const cached = getCachedPrice(ticker);
+  if (cached !== null) {
+    return cached;
+  }
+
+  let price = 0;
   if (isBondTicker(ticker)) {
     try {
-      return await fetchRavaPrice(ticker);
+      price = await fetchRavaPrice(ticker);
     } catch (err) {
       console.warn(`Rava failed for bond ${ticker}, falling back to Yahoo Finance:`, err.message);
       try {
-        return await fetchYahooPrice(ticker + '.BA');
+        price = await fetchYahooPrice(ticker + '.BA');
       } catch (e) {
-        return 0;
+        price = 0;
       }
     }
   } else {
     try {
       const symbol = ticker.includes('.') ? ticker : ticker + '.BA';
-      return await fetchYahooPrice(symbol);
+      price = await fetchYahooPrice(symbol);
     } catch (err) {
       console.warn(`Yahoo failed for stock/CEDEAR ${ticker}, falling back to Rava:`, err.message);
       try {
-        return await fetchRavaPrice(ticker);
+        price = await fetchRavaPrice(ticker);
       } catch (e) {
-        return 0;
+        price = 0;
       }
     }
   }
+
+  if (price > 0) setCachedPrice(ticker, price);
+  return price;
 }
 
-// Fetch dollar cripto (USDT/ARS ask rate)
+// Fetch dollar cripto (USDT/ARS ask rate) — cached for 7 minutes
 async function fetchDolarCripto() {
+  if (dollarCache.value !== null && (Date.now() - dollarCache.timestamp) < PRICE_CACHE_TTL) {
+    return dollarCache.value;
+  }
   try {
     const res = await fetch('https://criptoya.com/api/dolar', {
       headers: {
@@ -284,10 +318,13 @@ async function fetchDolarCripto() {
     });
     if (!res.ok) throw new Error(`CryptoYa returned status ${res.status}`);
     const data = await res.json();
-    return data.cripto?.usdt?.ask || 1500;
+    const rate = data.cripto?.usdt?.ask || 1500;
+    dollarCache.value = rate;
+    dollarCache.timestamp = Date.now();
+    return rate;
   } catch (err) {
     console.error('Error fetching dollar cripto:', err.message);
-    return 1500;
+    return dollarCache.value || 1500; // return last known value if available
   }
 }
 
@@ -994,10 +1031,45 @@ app.get('/api/test-fetch', async (req, res) => {
   try {
     const price = await fetchMarketPrice(ticker);
     const isBond = isBondTicker(ticker);
-    res.json({ ticker, price, isBond });
+    const cached = getCachedPrice(ticker) !== null;
+    res.json({ ticker, price, isBond, from_cache: cached });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Cache status endpoint
+app.get('/api/cache-status', (req, res) => {
+  const now = Date.now();
+  const entries = [];
+  for (const [ticker, entry] of priceCache.entries()) {
+    const age = Math.round((now - entry.timestamp) / 1000);
+    const ttlRemaining = Math.max(0, Math.round((PRICE_CACHE_TTL - (now - entry.timestamp)) / 1000));
+    entries.push({ ticker, price: entry.price, age_seconds: age, ttl_remaining_seconds: ttlRemaining });
+  }
+  const dollarAge = dollarCache.value !== null ? Math.round((now - dollarCache.timestamp) / 1000) : null;
+  res.json({
+    price_cache_entries: entries.length,
+    ttl_minutes: PRICE_CACHE_TTL / 60000,
+    prices: entries.sort((a, b) => a.ticker.localeCompare(b.ticker)),
+    dollar_cripto: {
+      value: dollarCache.value,
+      age_seconds: dollarAge,
+      ttl_remaining_seconds: dollarCache.value !== null
+        ? Math.max(0, Math.round((PRICE_CACHE_TTL - (now - dollarCache.timestamp)) / 1000))
+        : null
+    }
+  });
+});
+
+// Clear price cache (force fresh fetch on next request)
+app.post('/api/clear-cache', (req, res) => {
+  const count = priceCache.size;
+  priceCache.clear();
+  dollarCache.value = null;
+  dollarCache.timestamp = 0;
+  console.log(`Price cache cleared (${count} entries removed).`);
+  res.json({ success: true, cleared_entries: count, message: 'Caché de precios limpiada. Próxima consulta obtendrá precios frescos.' });
 });
 
 // Cron setup: at 18:00hs every day

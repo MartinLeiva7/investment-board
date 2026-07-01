@@ -559,6 +559,33 @@
         </form>
       </div>
 
+      <!-- Cache Management Card -->
+      <div class="glass-card p-6 rounded-2xl flex flex-col gap-4 mt-6 border border-slate-800/60">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h3 class="font-bold text-white text-base flex items-center gap-2">
+              <i data-lucide="zap" class="w-4 h-4 text-brand-400"></i>
+              Caché de Cotizaciones
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Las cotizaciones se almacenan en memoria por 7 minutos para acelerar la navegación. Limpiá la caché si necesitás precios actualizados de inmediato.</p>
+          </div>
+          <span id="cache-status-badge" class="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 whitespace-nowrap flex-shrink-0">Cargando...</span>
+        </div>
+        <div id="cache-entries-list" class="text-xs text-slate-500 hidden">
+          <!-- populated by JS -->
+        </div>
+        <div class="flex flex-wrap gap-3 border-t border-slate-800/80 pt-4">
+          <button onclick="loadCacheStatus()" class="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-all">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            Ver Estado
+          </button>
+          <button onclick="clearPriceCache()" class="flex items-center gap-1.5 bg-brand-600/10 hover:bg-brand-600/20 text-brand-400 border border-brand-500/20 px-4 py-2 rounded-xl text-xs font-bold transition-all">
+            <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+            Limpiar Caché
+          </button>
+        </div>
+      </div>
+
       <!-- Danger Zone Card -->
       <div class="glass-card p-6 rounded-2xl flex flex-col gap-4 mt-6 border-red-500/20">
         <div>
@@ -846,6 +873,8 @@
           if (allocationChartObj) allocationChartObj.resize();
           if (historyChartObj) historyChartObj.resize();
         }, 100);
+      } else if (tabId === 'settings') {
+        loadCacheStatus();
       }
     }
 
@@ -1137,6 +1166,52 @@
     }
 
     // Reset IOL History
+    // ─── Cache Management ────────────────────────────────────────────────────
+    async function loadCacheStatus() {
+      try {
+        const res = await fetch('/api/cache-status');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        const badge = document.getElementById('cache-status-badge');
+        const list = document.getElementById('cache-entries-list');
+
+        if (data.price_cache_entries === 0) {
+          badge.innerText = '0 entradas en caché';
+          badge.className = 'text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 whitespace-nowrap flex-shrink-0';
+          list.classList.add('hidden');
+        } else {
+          badge.innerText = `${data.price_cache_entries} tickers cacheados`;
+          badge.className = 'text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap flex-shrink-0';
+
+          const rows = data.prices.map(p =>
+            `<div class="flex justify-between py-0.5">
+              <span class="font-bold text-slate-400">${p.ticker}</span>
+              <span>$ ${p.price.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+              <span class="text-slate-600">expira en ${p.ttl_remaining_seconds}s</span>
+            </div>`
+          ).join('');
+          list.innerHTML = `<div class="bg-slate-950/40 border border-slate-800/50 rounded-xl px-4 py-3 flex flex-col gap-0.5 mt-1 mb-1">${rows}</div>`;
+          list.classList.remove('hidden');
+        }
+      } catch (err) {
+        showToast('Error', 'No se pudo consultar la caché.', true);
+      }
+    }
+
+    async function clearPriceCache() {
+      try {
+        const res = await fetch('/api/clear-cache', { method: 'POST' });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        showToast('Caché Limpiada', `${data.cleared_entries} entradas eliminadas. Próxima actualización obtendrá precios frescos.`);
+        await loadCacheStatus();
+      } catch (err) {
+        showToast('Error', 'No se pudo limpiar la caché.', true);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     function confirmResetIOL() {
       if (confirm('¿Estás seguro de que deseas eliminar todas tus transacciones de InvertirOnline? Esta acción no se puede deshacer.')) {
         resetIOL();
