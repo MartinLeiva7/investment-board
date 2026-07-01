@@ -14,8 +14,8 @@ app.use(express.json({ limit: '10mb' }));
 // Custom password authentication middleware (Basic Auth)
 app.use(async (req, res, next) => {
   try {
-    const password = process.env.DASHBOARD_PASSWORD || await getConfig('dashboard_password');
-    if (!password || password.trim() === '') {
+    const password = (process.env.DASHBOARD_PASSWORD || await getConfig('dashboard_password') || '').trim();
+    if (!password) {
       return next();
     }
     const authHeader = req.headers.authorization;
@@ -28,8 +28,8 @@ app.use(async (req, res, next) => {
       res.setHeader('WWW-Authenticate', 'Basic realm="Unified Wealth Dashboard"');
       return res.sendStatus(401);
     }
-    const credentials = Buffer.from(parts[1], 'base64').toString('ascii').split(':');
-    const pass = credentials[1];
+    const credentials = Buffer.from(parts[1], 'base64').toString('utf8').split(':');
+    const pass = credentials.slice(1).join(':').trim();
     if (pass === password) {
       return next();
     }
